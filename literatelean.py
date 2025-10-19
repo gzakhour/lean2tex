@@ -89,7 +89,7 @@ def process_tex_lines():
     \\end{minipage}
   };
   \\node[anchor=north east, yshift=-5pt] at (code.north east) {
-    \\href{%s#L%d-%d}{\includegraphics[width=2em]{git.png}}
+    \\href{%s#L%d-L%d}{\includegraphics[width=2em]{git.png}}
   };
 \\end{tikzpicture}
 """ % (BASE_URL, last_lean_start_line, tex_lines[i-1][1])
