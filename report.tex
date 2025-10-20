@@ -14,9 +14,14 @@
 \usepackage{fontspec}
 \setmonofont{FreeMono}
 
+% if you want an index
+\usepackage{imakeidx}
+\makeindex
+
 \definecolor{codebg}{rgb}{0.98,0.98,0.95}
 
 \begin{document}
 \input{out.tex}
 \bibliography{out}
+\printindex
 \end{document}

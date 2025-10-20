@@ -16,7 +16,7 @@ STATE_LEAN = 0
 STATE_TEX = 1
 STATE_BIB = 2
 
-state = STATE_LEAN
+state_stack = [STATE_LEAN]
 
 if len(sys.argv) != 3:
   print("USAGE: %s <file> <base_url>" % sys.argv[0])
@@ -26,15 +26,14 @@ BASE_URL = sys.argv[2]
 
 for line in open(sys.argv[1]).readlines():
   clean_line = line.strip()
-  if clean_line == "/-@":
-    state = STATE_TEX
+  if clean_line == "/-@tex" or clean_line == "/-@":
+    state_stack.append(STATE_TEX)
   elif clean_line == "@-/":
-    state = STATE_LEAN
-  elif clean_line == "/-!":
-    state = STATE_BIB
-  elif clean_line == "!-/":
-    state = STATE_LEAN
+    state_stack.pop()
+  elif clean_line == "/-@bib":
+    state_stack.append(STATE_BIB)
   else:
+    state = state_stack[-1]
     if state == STATE_TEX:
       def escape(match):
         ident = match.group(1)
@@ -53,7 +52,7 @@ for line in open(sys.argv[1]).readlines():
         tokens = clean_line.split()
         if len(tokens) > 0 and tokens[0] in ["def", "theorem", "inductive", "class"]:
           ident = tokens[1].split(":")[0]
-          line = line[:-1] + ("!\\phantomsection\\label{lean:%s}!\n" % ident)
+          line = line[:-1] + ("!\\phantomsection\\label{lean:%s}\\index{\\ttfamily \\hyperref[lean:%s]{%s}}!\n" % (ident, ident, ident.replace('_', '\\_')))
         tex_lines.append((1,len(lean_lines),line))
 
 tex_lines.append((0,0,"")) # this helps

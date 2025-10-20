@@ -1,4 +1,4 @@
-/-@
+/-@tex
 
 \title{A Simple Utility for Literate Lean}
 \author{George Zakhour}
@@ -28,7 +28,7 @@ The text and its accompanying citations in the \LaTeX~file are always inside com
 The human readable part of the document must be valid \LaTeX, but it may not be a complete document.
 To the user's convenience we supplied a minimal \texttt{report.tex} \LaTeX~document and \texttt{Makefile} that may help you in getting started.
 
-All text must appear between the comment delimeters: \texttt{/-@} and \texttt{@-/}.
+All text must appear between the comment delimeters: \texttt{/-@tex} and \texttt{@-/}, or more convienently between \texttt{/-@} and \texttt{@-/}.
 Each delimeter must appear on its own line with no text before or after it (whitespace is allowed).
 
 Multiple human readable blocks are allowed in a document.
@@ -37,10 +37,10 @@ The final \LaTeX~document will concatenate all these blocks in the same order th
 \subsection{Bibliography}
 
 Bibliography data must be valid bibtex~\cite{patashnik1984bibtex}.
-Like human readable text, these must appear inside comments and their delimeters are \texttt{/-!} and \texttt{!-/}.
+Like human readable text, these must appear inside comments and their delimeters are \texttt{/-@bib} and \texttt{@-/}.
 Only whitespace may appear around these delimeters on the line they occupy.
-@-/
-/-!
+
+/-@bib
 @article{patashnik1984bibtex,
   title={BIBTEX 101},
   author={Patashnik, Oren},
@@ -57,12 +57,11 @@ Only whitespace may appear around these delimeters on the line they occupy.
   year={2021},
   organization={Springer}
 }
-!-/
-/-@
+@-/
 
 Just like human readable text, many bibliography blocks are allowed and the resulting bib file will be the concatenation of all the blocks.
 
-Sadly, comments cannot be nested presently.
+Human-readable text and bibliography commenst may be arbitrarily nested.
 
 \subsection{Lean Text}
 
@@ -87,7 +86,7 @@ checks the type of the identity function.
 #check (λ x ↦ x) 2
 #check (λ x ↦ x)
 
-/-@
+/-@tex
 
 Sadly, this utility is too simple to use the Lean LSP to show the result of the \texttt{\#eval} and \texttt{\#check} calls.
 
@@ -105,7 +104,7 @@ inductive nat where
   | zero
   | succ (n: nat)
 
-/-@
+/-@tex
 
 The definition of addition, in \lean{add}, is the following:
 
@@ -134,16 +133,22 @@ theorem add_comm: ∀ (n m : nat), add n m = add m n := by
     case zero => simp only [add, ih]
     case succ m' ih' => simp [add,ih,←ih']
 
-/-@
+/-@tex
 
 The tool is again simple, it creates a label to definitions, theorems, inductive types, and type
 classes if and only if the declaration starts on a new line with the keyword \texttt{def},
 \texttt{theorem}, \texttt{inductive}, and \texttt{class} keyword (respectively) being the first
 token of the line and the identifier to be bound is the second token.
 
+
+\subsection{Index}
+
+An index is automatically collected of all the definitions, theorems, inductive types, and type classes.
+If you wish to have them rendered in the final document you must have the two commands \texttt{\\makeindex} and \texttt{\\printindex}.
+
 @-/
 
-/-!
+/-@bib
 @book{kennedy2012peano,
   title={Peano: life and works of Giuseppe Peano},
   author={Kennedy, Hubert},
@@ -151,4 +156,4 @@ token of the line and the identifier to be bound is the second token.
   year={2012},
   publisher={Springer Science \& Business Media}
 }
-!-/
+@-/
