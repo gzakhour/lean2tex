@@ -16,6 +16,8 @@ STATE_LEAN = 0
 STATE_TEX = 1
 STATE_BIB = 2
 
+state_lean_hiding = False
+
 state_stack = [STATE_LEAN]
 
 if len(sys.argv) != 3:
@@ -30,6 +32,7 @@ for line in open(sys.argv[1]).readlines():
     state_stack.append(STATE_TEX)
   elif clean_line == "@-/":
     state_stack.pop()
+    state_lean_hiding = False
   elif clean_line == "/-@bib":
     state_stack.append(STATE_BIB)
   else:
@@ -44,16 +47,18 @@ for line in open(sys.argv[1]).readlines():
       bib_contents += line
     elif state == STATE_LEAN:
       lean_lines.append(line)
-      if line[:-1].endswith("; "):
-        indentation = (len(line) - len(line.lstrip())) * ' '
-        if len(tex_lines) > 0 and not tex_lines[-1][2].strip() == '-- ...':
-          tex_lines.append((1, len(lean_lines), indentation + '-- ...\n'))
-      else:
+      if not state_lean_hiding:
         tokens = clean_line.split()
         if len(tokens) > 0 and tokens[0] in ["def", "theorem", "inductive", "class"]:
           ident = tokens[1].split(":")[0]
           line = line[:-1] + ("!\\phantomsection\\label{lean:%s}\\index{\\ttfamily \\hyperref[lean:%s]{%s}}!\n" % (ident, ident, ident.replace('_', '\\_')))
-        tex_lines.append((1,len(lean_lines),line))
+        if clean_line.endswith("-- {{{"):
+          tex_lines.append((1, len(lean_lines), line.replace("-- {{{", "-- ...")))
+          state_lean_hiding = True
+        else:
+          tex_lines.append((1, len(lean_lines), line))
+      else:
+        state_lean_hiding = not clean_line.endswith("-- }}}")
 
 tex_lines.append((0,0,"")) # this helps
 

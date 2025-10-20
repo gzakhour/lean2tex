@@ -48,8 +48,9 @@ Human-readable text and bibliography commenst may be arbitrarily nested.
 
 As a literate lean program is a Lean program then Lean code does not appear inside comments.
 
-By default every line of Lean code makes it in the \LaTeX~document inside a formated \texttt{minted} block unless the line ends with exactly \texttt{;<space>}.
-Any sequence of one or more hidden lines will be replaced in the \LaTeX~source code with \texttt{-- ...}.
+By default every line of Lean code makes it in the \LaTeX~document inside a formated \texttt{minted} block.
+It is possible to hide parts of Lean code by wrapping them inside \texttt{-- \{\{\{} and \texttt{-- \}\}\}}.
+All the lean lines in between two comments will not be displayed and instead a \texttt{-- ...} will be displayed instead exactly where the opening delimiter is.
 
 Lean comments are equally moved into the \LaTeX~output.
 That choice was made to encourage moving all comments into a literate format.
@@ -81,7 +82,7 @@ Sadly, this utility is too simple to use the Lean LSP to show the result of the 
 Or even to show errors in a nicely formatted way.
 
 But it does have a cool feature that allows you to reference definitions, theorems, inductive types, and type classes from the \LaTeX~code.
-This can be done using the \texttt{\\lean} macro which the utility expands before passing it to the \LaTeX~compiler.
+This can be done using the \texttt{{\textbackslash}lean} macro which the utility expands before passing it to the \LaTeX~compiler.
 
 For example, \hyperref[lean:nat]{\ttfamily nat} is the definition of the Peano~\cite{kennedy2012peano} numbers.
 
@@ -128,8 +129,7 @@ If you wish to see it you may do so by clicking on the git icon
       \begin{minted}[escapeinside=!!,fontsize=\small,baselinestretch=0.85,bgcolor=codebg]{lean4}
 theorem add_comm: ∀ (n m : nat), add n m = add m n := by!\phantomsection\label{lean:add_comm}\index{\ttfamily \hyperref[lean:add_comm]{add\_comm}}!
   intros n; induction n
-  case zero =>
-    -- ...
+  case zero => -- ...
   case succ n ih =>
     intros m; induction m
     case zero => simp only [add, ih]
@@ -151,5 +151,33 @@ token of the line and the identifier to be bound is the second token.
 \subsection{Index}
 
 An index is automatically collected of all the definitions, theorems, inductive types, and type classes.
-If you wish to have them rendered in the final document you must have the two commands \texttt{\\makeindex} and \texttt{\\printindex}.
+If you wish to have them rendered in the final document you must have the two commands \texttt{{\textbackslash}makeindex} and \texttt{{\textbackslash}printindex}.
 
+For example, in the following code, without even referring to the Printable type class in the text through the \texttt{{\textbackslash}lean} macro, the symbol still makes it to the index.
+
+\noindent\begin{tikzpicture}
+  \node[anchor=north west, inner sep=0] (code) at (0,0) {
+    \begin{minipage}{\linewidth}
+      \begin{minted}[escapeinside=!!,fontsize=\small,baselinestretch=0.85,bgcolor=codebg]{lean4}
+class Printable (α: Type) where!\phantomsection\label{lean:Printable}\index{\ttfamily \hyperref[lean:Printable]{Printable}}!
+  print: α → String
+
+instance : Printable nat where
+  print n := toString n
+    where toString (n: nat) : String :=
+      match n with
+      | nat.zero => "0"
+      | nat.succ n => "S" ++ toString n
+
+instance : Printable String where
+  print x := x
+
+#eval Printable.print (nat.succ (nat.succ nat.zero))
+#eval Printable.print "Hello, World!"
+\end{minted}
+    \end{minipage}
+  };
+  \node[anchor=north east, yshift=-5pt] at (code.north east) {
+    \href{https://github.com/geezee/literatelean/blob/main/out.lean#L30-L44}{\includegraphics[width=2em]{git.png}}
+  };
+\end{tikzpicture}

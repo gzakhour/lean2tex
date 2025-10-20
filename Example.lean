@@ -67,8 +67,9 @@ Human-readable text and bibliography commenst may be arbitrarily nested.
 
 As a literate lean program is a Lean program then Lean code does not appear inside comments.
 
-By default every line of Lean code makes it in the \LaTeX~document inside a formated \texttt{minted} block unless the line ends with exactly \texttt{;<space>}.
-Any sequence of one or more hidden lines will be replaced in the \LaTeX~source code with \texttt{-- ...}.
+By default every line of Lean code makes it in the \LaTeX~document inside a formated \texttt{minted} block.
+It is possible to hide parts of Lean code by wrapping them inside \texttt{-- \{\{\{} and \texttt{-- \}\}\}}.
+All the lean lines in between two comments will not be displayed and instead a \texttt{-- ...} will be displayed instead exactly where the opening delimiter is.
 
 Lean comments are equally moved into the \LaTeX~output.
 That choice was made to encourage moving all comments into a literate format.
@@ -93,7 +94,7 @@ Sadly, this utility is too simple to use the Lean LSP to show the result of the 
 Or even to show errors in a nicely formatted way.
 
 But it does have a cool feature that allows you to reference definitions, theorems, inductive types, and type classes from the \LaTeX~code.
-This can be done using the \texttt{\\lean} macro which the utility expands before passing it to the \LaTeX~compiler.
+This can be done using the \texttt{{\textbackslash}lean} macro which the utility expands before passing it to the \LaTeX~compiler.
 
 For example, \lean{nat} is the definition of the Peano~\cite{kennedy2012peano} numbers.
 
@@ -124,10 +125,10 @@ If you wish to see it you may do so by clicking on the git icon
 
 theorem add_comm: ∀ (n m : nat), add n m = add m n := by
   intros n; induction n
-  case zero =>
-    intros m; induction m; 
-    case zero => simp only [add]; 
-    case succ m' ih => simp only [add, ←ih]; 
+  case zero => -- {{{
+    intros m; induction m;
+    case zero => simp only [add];
+    case succ m' ih => simp only [add, ←ih]; -- }}}
   case succ n ih =>
     intros m; induction m
     case zero => simp only [add, ih]
@@ -144,9 +145,27 @@ token of the line and the identifier to be bound is the second token.
 \subsection{Index}
 
 An index is automatically collected of all the definitions, theorems, inductive types, and type classes.
-If you wish to have them rendered in the final document you must have the two commands \texttt{\\makeindex} and \texttt{\\printindex}.
+If you wish to have them rendered in the final document you must have the two commands \texttt{{\textbackslash}makeindex} and \texttt{{\textbackslash}printindex}.
+
+For example, in the following code, without even referring to the Printable type class in the text through the \texttt{{\textbackslash}lean} macro, the symbol still makes it to the index.
 
 @-/
+
+class Printable (α: Type) where
+  print: α → String
+
+instance : Printable nat where
+  print n := toString n
+    where toString (n: nat) : String :=
+      match n with
+      | nat.zero => "0"
+      | nat.succ n => "S" ++ toString n
+
+instance : Printable String where
+  print x := x
+
+#eval Printable.print (nat.succ (nat.succ nat.zero))
+#eval Printable.print "Hello, World!"
 
 /-@bib
 @book{kennedy2012peano,
