@@ -66,7 +66,7 @@ class LeanLSP:
     self.server.stdin.write(f'Content-Length: {content_length}\r\n\r\n{body}'.encode('utf-8'))
     self.server.stdin.flush()
     if has_id:
-      while id not in self.responses: time.sleep(0.01)
+      while id not in self.responses: time.sleep(0.001)
       return self.responses[id]
 
   def stop(self):
@@ -97,10 +97,13 @@ class LeanLSP:
     return self.all_symbols[lineno] if lineno in self.all_symbols else []
 
   def get_proof_state_at(self, line, char):
-    return "\n\n".join(self.send("$/lean/plainGoal", {
+    proof = self.send("$/lean/plainGoal", {
       "textDocument": { "uri": self.document_uri, },
       "position": { "line": line, "character": char }
-    })["result"]["goals"])
+    })["result"]
+    if proof is None or "goals" not in proof:
+      return None
+    return "\n\n".join(proof["goals"])
 
   def get_diagnostic(self, line):
     return self.diagnostics[line] if line in self.diagnostics else None
@@ -153,6 +156,7 @@ class TeXProcessor(Processor):
     self.previous_state = None
     self.hiding_lean = False
     self.start_lean_lineno = 0
+    self.previous_proof_state = None
 
   def handle(self, state, lineno, line):
 
@@ -169,6 +173,7 @@ class TeXProcessor(Processor):
       self.hiding_lean = False
       # we open minted OR we ignore new empty lines
       if state == State.LEAN:
+        self.previous_proof_state = None
         self.start_lean_lineno = len(self.lean_processor.contents)
         self.lines.append("""
 \\noindent\\begin{tikzpicture}
@@ -216,16 +221,45 @@ class TeXProcessor(Processor):
           line = line.replace("-- {{"+"{", "-- ...")
           self.hiding_lean = True
         line = line[:-1]
-        for symbol in self.lean_lsp.get_all_symbols_at_line(int(lineno)-1): # lsp is 0-indexed
-          line += "!\\phantomsection\\label{lean:%s}\\index{\\ttfamily \\hyperref[lean:%s]{%s}}!" % (
-            symbol.replace(' ',''), symbol.replace(' ',''), symbol.replace('_', '\\_'))
+        line = self._inject_goal_state(line, lineno)
+        line = self._inject_def_symbol_labels(line, lineno)
         line += '\n'
-        diagnostic = self.lean_lsp.get_diagnostic(lineno-1) # lsp is 0-indexed
         self.lines.append(line)
-        if diagnostic is not None: self.lines.append('-- ' + diagnostic + '\n')
+        self._inject_diagnostic_messages(line, lineno)
       else:
         self.hiding_lean = not line.rstrip().endswith("-- }}"+"}")
       return
+
+  def _inject_def_symbol_labels(self, line, lineno):
+    for symbol in self.lean_lsp.get_all_symbols_at_line(int(lineno)-1): # lsp is 0-indexed
+      line += "!\\phantomsection\\label{lean:%s}\\index{\\ttfamily \\hyperref[lean:%s]{%s}}!" % (
+        symbol.replace(' ',''), symbol.replace(' ',''), symbol.replace('_', '\\_'))
+    return line
+
+  def _inject_goal_state(self, line, lineno):
+    points = []
+    for c in range(len(line)):
+      if not line[c].isspace():
+        goal = self.lean_lsp.get_proof_state_at(lineno-1, c)
+        if self.previous_proof_state != goal:
+          self.previous_proof_state = goal
+          if len(goal) > 0:
+            while c < len(line) and not line[c].isspace(): c += 1
+            points.append((c, goal))
+    new_line = ""
+    for c in range(len(line)):
+      if len(points) > 0:
+        if points[0][0] == c:
+          (_, proof) = points.pop(0)
+          new_line += "!\\footnote{\\texttt{" + '\\\\'.join(proof.split("\n")).replace('_', '\\_') + "}}!"
+      new_line += line[c]
+    return new_line
+
+  def _inject_diagnostic_messages(self, line, lineno):
+    diagnostic = self.lean_lsp.get_diagnostic(lineno-1) # lsp is 0-indexed
+    if diagnostic is not None:
+      self.lines.append('-- ' + diagnostic.replace('\n', '\n--') + '\n')
+
 
   def export(self, file):
     open(file, "w").write("".join(self.lines))
