@@ -156,3 +156,4 @@ TSWLatexianTemp*
 out.bib
 out.lean
 out.tex
+proof_out.tex
