@@ -1,0 +1,69 @@
+\documentclass{article}
+
+\bibliographystyle{acm}
+
+\usepackage{amssymb} % used for the \blacktriangleright in minted
+\usepackage{minted}
+\usemintedstyle{pastie}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks = true,
+  linkbordercolor = {white},
+  linkcolor = {RoyalPurple},
+  citecolor = {ForestGreen},
+}
+
+% A font is needed that includes Lean unicode characters
+\usepackage{fontspec}
+\setmonofont{FreeMono}
+
+% if you want an index
+\usepackage{imakeidx}
+\makeindex
+
+\definecolor{codebg}{rgb}{0.98,0.98,0.95}
+
+\newcommand{\leanRef}[2]{%
+  \hyperref[lean:#1]{\ttfamily#2}%
+}
+
+\newcommand{\leanLabel}[2]{%
+  \phantomsection%
+  \label{lean:#1}%
+  \index{\leanRef{#1}{#2}}%
+}
+
+\newenvironment{leanProofGoal}[2]
+ {\VerbatimEnvironment
+  \subsection*{\hyperref[lean:proof:#1:#2:back]{Line #1}}
+  \label{lean:proof:#1:#2}
+  \begin{figure}[ht!]
+  \centering
+  \begin{minted}[frame=lines]{lean4}}
+ {\end{minted}\end{figure}}
+
+\makeatletter
+\newcommand{\leanProofGoalRef}[2]{%
+  \@ifundefined{r@lean:proof:#1:#2}{}{%
+    \phantomsection%
+    \label{lean:proof:#1:#2:back}%
+    \hyperref[lean:proof:#1:#2]{%
+      \raisebox{0.3ex}{\tiny$\blacktriangleright$}%
+    }%
+  }%
+}
+\makeatother
+
+
+\begin{document}
+\input{out.tex}
+\bibliography{out}
+\printindex
+\appendix
+\input{proof_out.tex}
+\end{document}

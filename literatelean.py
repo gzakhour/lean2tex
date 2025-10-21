@@ -66,7 +66,7 @@ class LeanLSP:
     self.server.stdin.write(f'Content-Length: {content_length}\r\n\r\n{body}'.encode('utf-8'))
     self.server.stdin.flush()
     if has_id:
-      while id not in self.responses: time.sleep(0.001)
+      while id not in self.responses: time.sleep(0.01)
       return self.responses[id]
 
   def stop(self):
@@ -152,6 +152,7 @@ class TeXProcessor(Processor):
     self.lean_lsp = lean_lsp
 
     self.lines = []
+    self.proof_states = [] # (lineno, char, goal)
 
     self.previous_state = None
     self.hiding_lean = False
@@ -206,7 +207,7 @@ class TeXProcessor(Processor):
     if state == State.TEX:
       line = re.sub(
         r'\\lean{([^}]+)}',
-        lambda m: '\\hyperref[lean:%s]{\\ttfamily %s}' % (m.group(1).replace(' ', ''), m.group(1).replace('_', '\\_')),
+        lambda m: '\\leanRef{%s}{%s}' % (m.group(1).replace(' ', ''), m.group(1).replace('_', '\\_')),
         line)
       self.lines.append(line)
       return
@@ -232,26 +233,30 @@ class TeXProcessor(Processor):
 
   def _inject_def_symbol_labels(self, line, lineno):
     for symbol in self.lean_lsp.get_all_symbols_at_line(int(lineno)-1): # lsp is 0-indexed
-      line += "!\\phantomsection\\label{lean:%s}\\index{\\ttfamily \\hyperref[lean:%s]{%s}}!" % (
-        symbol.replace(' ',''), symbol.replace(' ',''), symbol.replace('_', '\\_'))
+      line += "!\\leanLabel{%s}{%s}!" % (symbol.replace(' ',''), symbol.replace('_', '\\_'))
     return line
 
   def _inject_goal_state(self, line, lineno):
     points = []
     for c in range(len(line)):
-      if not line[c].isspace():
-        goal = self.lean_lsp.get_proof_state_at(lineno-1, c)
-        if self.previous_proof_state != goal:
-          self.previous_proof_state = goal
-          if len(goal) > 0:
-            while c < len(line) and not line[c].isspace(): c += 1
-            points.append((c, goal))
+      if line[c].isspace(): continue
+      goal = self.lean_lsp.get_proof_state_at(lineno-1, c) # lsp is 0-indexed
+      if self.previous_proof_state != goal:
+        self.previous_proof_state = goal
+        if len(goal) == 0: continue # we do not log terminated proofs
+        # lean has this awful feature of applying a tactic when the cursor's just after the first character
+        # of the tactic name, so it's hard to find where the tactic actually ends. Next best thing is to add
+        # the link at the next space.
+        while c < len(line) and not line[c].isspace(): c += 1
+        self.proof_states.append((lineno, c, goal))
+        points.append(c)
+
     new_line = ""
     for c in range(len(line)):
       if len(points) > 0:
-        if points[0][0] == c:
-          (_, proof) = points.pop(0)
-          new_line += "!\\footnote{\\texttt{" + '\\\\'.join(proof.split("\n")).replace('_', '\\_') + "}}!"
+        if points[0] == c:
+          points.pop(0)
+          new_line += "!\leanProofGoalRef{%d}{%d}!" % (lineno, c)
       new_line += line[c]
     return new_line
 
@@ -263,6 +268,10 @@ class TeXProcessor(Processor):
 
   def export(self, file):
     open(file, "w").write("".join(self.lines))
+    open("proof_" + file, "w").write("\section{Proof Goals}\n\n" + "\n\n".join([
+      "\\begin{leanProofGoal}{%d}{%d}\n%s\n\\end{leanProofGoal} " % (lineno, char, goal.replace('✝', '†'))
+      for (lineno, char, goal) in self.proof_states
+    ]))
 
 
 def main():

@@ -129,7 +129,7 @@ theorem add_comm: ∀ (n m : nat), add n m = add m n := by
     intros m; induction m;
     case zero => simp only [add];
     case succ m' ih => simp only [add, ←ih]; -- }}}
-  case succ n ih =>
+  case succ n ih => -- ***
     intros m; induction m
     case zero => simp only [add, ih]
     case succ m' ih' => simp [add,ih,←ih']
