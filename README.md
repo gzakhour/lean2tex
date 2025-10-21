@@ -1,3 +1,3 @@
 # Literate Lean
 
-Go read the `report.pdf` file or `Example.lean` to get started
+Go read the `example/report.pdf` file or `example/Example.lean` to get started

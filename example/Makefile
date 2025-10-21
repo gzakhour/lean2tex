@@ -1,5 +1,5 @@
 LEAN_FILE=Example.lean
-BASE_URL=https://github.com/geezee/literatelean/blob/main/example/out.lean
+BASE_URL=https://github.com/geezee/lean2lex/blob/main/example/out.lean
 
 report.pdf: report.tex out.bib out.lean out.tex proof_out.tex
 	xelatex -shell-escape report.tex
