@@ -38,14 +38,14 @@
   \index{\leanRef{#1}{#2}}%
 }
 
-\newenvironment{leanProofGoal}[2]
+\newenvironment{leanProofGoal}[3]
  {\VerbatimEnvironment
-  \subsection*{\hyperref[lean:proof:#1:#2:back]{Line #1}}
+  \subsection*{\hyperref[lean:proof:#1:#2:back]{#3}}
   \label{lean:proof:#1:#2}
-  \begin{figure}[ht!]
+  \begin{minipage}{\textwidth}
   \centering
   \begin{minted}[frame=lines]{lean4}}
- {\end{minted}\end{figure}}
+ {\end{minted}\end{minipage}}
 
 \makeatletter
 \newcommand{\leanProofGoalRef}[2]{%
@@ -53,11 +53,13 @@
     \phantomsection%
     \label{lean:proof:#1:#2:back}%
     \hyperref[lean:proof:#1:#2]{%
-      \raisebox{0.3ex}{\tiny$\blacktriangleright$}%
+      \raisebox{0.2ex}{\tiny$\blacktriangleright$}%
     }%
   }%
 }
 \makeatother
+
+\usepackage{tcolorbox}
 
 
 \begin{document}

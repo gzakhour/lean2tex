@@ -180,7 +180,7 @@ class TeXProcessor(Processor):
 \\noindent\\begin{tikzpicture}
   \\node [anchor=north west, inner sep=0] (code) at (0,0) {
     \\begin{minipage}{\\linewidth}
-      \\begin{minted}[escapeinside=!!,fontsize=\\small,baselinestretch=0.85,bgcolor=codebg]{lean4}\n
+      \\begin{minted}[escapeinside=!!,fontsize=\\footnotesize,baselinestretch=0.85,bgcolor=codebg]{lean4}\n
 """)
       # we close minted
       elif state == State.TEX:
@@ -222,10 +222,12 @@ class TeXProcessor(Processor):
           line = line.replace("-- {{"+"{", "-- ...")
           self.hiding_lean = True
         line = line[:-1]
+        (line, extras) = self._get_extra_proof_state_lines(line, lineno) # it's important that `line` has not been manipulated
         line = self._inject_goal_state(line, lineno)
         line = self._inject_def_symbol_labels(line, lineno)
         line += '\n'
         self.lines.append(line)
+        self.lines += extras
         self._inject_diagnostic_messages(line, lineno)
       else:
         self.hiding_lean = not line.rstrip().endswith("-- }}"+"}")
@@ -247,30 +249,56 @@ class TeXProcessor(Processor):
         # lean has this awful feature of applying a tactic when the cursor's just after the first character
         # of the tactic name, so it's hard to find where the tactic actually ends. Next best thing is to add
         # the link at the next space.
-        while c < len(line) and not line[c].isspace(): c += 1
-        self.proof_states.append((lineno, c, goal))
-        points.append(c)
+        start = max(0, c-1)
+        while c < len(line) and not line[c].isspace() and line[c] not in ['[',']',',',';']: c += 1
+        self.proof_states.append((lineno, c, line[start:c], goal))
+        points.append((start, c))
 
     new_line = ""
-    for c in range(len(line)):
+    for c in range(len(line)+1):
       if len(points) > 0:
-        if points[0] == c:
+        if points[0][1] == c:
           points.pop(0)
           new_line += "!\leanProofGoalRef{%d}{%d}!" % (lineno, c)
-      new_line += line[c]
+      if c < len(line): new_line += line[c]
+
     return new_line
+
+  def _get_extra_proof_state_lines(self, line, lineno):
+    line = line.rstrip()
+    match = re.match(r'^.*-- >>>(.*)$', line)
+    if match is None: return (line, [])
+    tokens = list(map(lambda t: t.strip(), match.group(1).split()))
+    line = re.sub(r"-- >>>.*$", "", line)
+    indent = ' ' * (len(line) - len(line.lstrip()))
+    proof = self.lean_lsp.get_proof_state_at(lineno-1, len(line))
+    if len(tokens) == 0:
+      return (line, list(map(lambda x: indent + "-- " + x + "\n",
+                             self._format_proof_goal(proof).split("\n"))))
+    else:
+      proof_lines = proof.split('\n')
+      extras = []
+      for t in tokens:
+        for pl in proof_lines:
+          match = re.match('^' + t + '.*$', pl)
+          if match is None: continue
+          extras.append(indent + "-- " + pl + "\n")
+          break
+      return (line, extras)
 
   def _inject_diagnostic_messages(self, line, lineno):
     diagnostic = self.lean_lsp.get_diagnostic(lineno-1) # lsp is 0-indexed
     if diagnostic is not None:
       self.lines.append('-- ' + diagnostic.replace('\n', '\n--') + '\n')
 
+  def _format_proof_goal(self, proofGoal):
+    return proofGoal.replace('✝', '†')
 
   def export(self, file):
     open(file, "w").write("".join(self.lines))
     open("proof_" + file, "w").write("\section{Proof Goals}\n\n" + "\n\n".join([
-      "\\begin{leanProofGoal}{%d}{%d}\n%s\n\\end{leanProofGoal} " % (lineno, char, goal.replace('✝', '†'))
-      for (lineno, char, goal) in self.proof_states
+      "\\begin{leanProofGoal}{%d}{%d}{%s}\n%s\n\\end{leanProofGoal} " % (lineno, char, name, self._format_proof_goal(goal))
+      for (lineno, char, name, goal) in self.proof_states
     ]))
 
 
