@@ -144,6 +144,9 @@ class LeanProcessor(Processor):
   def export(self, file):
     open(file, "w").write("".join(self.contents))
 
+  def getlineno(self):
+    return len(self.contents)
+
 
 class TeXProcessor(Processor):
   def __init__(self, git_url, lean_processor, lean_lsp):
@@ -176,7 +179,7 @@ class TeXProcessor(Processor):
       # we open minted OR we ignore new empty lines
       if state == State.LEAN:
         self.previous_proof_state = None
-        self.start_lean_lineno = len(self.lean_processor.contents)
+        self.start_lean_lineno = self.lean_processor.getlineno()
         self.lines.append("""
 \\noindent\\begin{tikzpicture}
   \\node [anchor=north west, inner sep=0] (code) at (0,0) {
@@ -189,7 +192,7 @@ class TeXProcessor(Processor):
         while len(self.lean_processor.contents[self.start_lean_lineno].strip()) == 0:
           self.start_lean_lineno += 1
         # skip beginning lines that are empty
-        last_line_no = len(self.lean_processor.contents) - 1
+        last_line_no = self.lean_processor.getlineno() - 1
         while len(self.lean_processor.contents[last_line_no].strip()) == 0:
           last_line_no -= 1
         self.lines.append("""
@@ -228,13 +231,15 @@ class TeXProcessor(Processor):
         line = self._inject_goal_state(line, lineno)
         line = self._inject_def_symbol_labels(line, lineno)
         line += '\n'
-        self.lines.append(line)
+        if len(line.strip()) == 0:
+          self.lines.append(line)
+        else:
+          self.lines.append(self._render_lineno(self.lean_processor.getlineno()) + line)
         self.lines += extras
         self._inject_diagnostic_messages(line, lineno)
       elif line.rstrip().endswith("-- }}"+"}"):
         self.hiding_lean_numlines += 1
-        indent = " " * (len(line) - len(line.lstrip()))
-        self.lines.append(indent + "-- %d lines hidden\n" % self.hiding_lean_numlines)
+        self.lines.append(self._new_comment(line, "%d lines hidden\n" % self.hiding_lean_numlines))
         self.hiding_lean = False
       else:
         self.hiding_lean_numlines += 1
@@ -258,7 +263,7 @@ class TeXProcessor(Processor):
         # the link at the next space.
         start = max(0, c-1)
         while c < len(line) and not line[c].isspace() and line[c] not in ['[',']',',',';']: c += 1
-        self.proof_states.append((lineno, c, line[start:c], goal, len(self.lean_processor.contents)))
+        self.proof_states.append((lineno, c, line[start:c], goal, self.lean_processor.getlineno()))
         points.append((start, c))
 
     new_line = ""
@@ -271,16 +276,29 @@ class TeXProcessor(Processor):
 
     return new_line
 
+  def _render_lineno(self, lineno, count=4, phantom=False):
+    n = str(lineno)
+    pad = "\\phantom{0}" * (count - len(n))
+    if phantom:
+      return "!\\phantom{\\tiny{" + pad + n + "}}! "
+    else:
+      return "!\\tiny{" + pad + n + "}! "
+
+  def _new_comment(self, line, contents):
+    indent = " " * (len(line) - len(line.lstrip()))
+    lineno = self._render_lineno(self.lean_processor.getlineno(), phantom=True)
+    nl = "\n" if len(line.strip()) == 0 or line[-1] != "\n" else ""
+    return lineno + indent + "-- " + contents + nl
+
   def _get_extra_proof_state_lines(self, line, lineno):
     line = line.rstrip()
     match = re.match(r'^.*-- >>>(.*)$', line)
     if match is None: return (line, [])
     tokens = list(map(lambda t: t.strip(), match.group(1).split()))
     line = re.sub(r"-- >>>.*$", "", line)
-    indent = ' ' * (len(line) - len(line.lstrip()))
     proof = self.lean_lsp.get_proof_state_at(lineno-1, len(line))
     if len(tokens) == 0:
-      return (line, list(map(lambda x: indent + "-- " + x + "\n",
+      return (line, list(map(lambda x: self._new_comment(line, x),
                              self._format_proof_goal(proof).split("\n"))))
     else:
       proof_lines = proof.split('\n')
@@ -289,14 +307,14 @@ class TeXProcessor(Processor):
         for pl in proof_lines:
           match = re.match('^' + t + '.*$', pl)
           if match is None: continue
-          extras.append(indent + "-- " + pl + "\n")
+          extras.append(self._new_comment(line, pl))
           break
       return (line, extras)
 
   def _inject_diagnostic_messages(self, line, lineno):
     diagnostic = self.lean_lsp.get_diagnostic(lineno-1) # lsp is 0-indexed
     if diagnostic is not None:
-      self.lines.append('-- ' + diagnostic.replace('\n', '\n--') + '\n')
+      self.lines.append(self._new_comment("", diagnostic.replace('\n', '\n--')))
 
   def _format_proof_goal(self, proofGoal):
     return proofGoal.replace('✝', '†')
