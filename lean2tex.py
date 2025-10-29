@@ -156,6 +156,7 @@ class TeXProcessor(Processor):
 
     self.previous_state = None
     self.hiding_lean = False
+    self.hiding_lean_numlines = 0
     self.start_lean_lineno = 0
     self.previous_proof_state = None
 
@@ -215,11 +216,12 @@ class TeXProcessor(Processor):
     # if we're processing Lean we need to:
     #   1. hide everything between the comment delimeters
     #   2. add labels to symbols being defined on that current line
-    #   3. TODO add indicators and links to proof states wherever it changes
+    #   3. add indicators and links to proof states wherever it changes
     elif state == State.LEAN:
       if not self.hiding_lean:
         if line.rstrip().endswith("-- {{"+"{"): # my vim don't jiggle jiggle, it folds
-          line = line.replace("-- {{"+"{", "-- ...")
+          self.hiding_lean_numlines = 0
+          line = line.replace("-- {{"+"{","")
           self.hiding_lean = True
         line = line[:-1]
         (line, extras) = self._get_extra_proof_state_lines(line, lineno) # it's important that `line` has not been manipulated
@@ -229,8 +231,13 @@ class TeXProcessor(Processor):
         self.lines.append(line)
         self.lines += extras
         self._inject_diagnostic_messages(line, lineno)
+      elif line.rstrip().endswith("-- }}"+"}"):
+        self.hiding_lean_numlines += 1
+        indent = " " * (len(line) - len(line.lstrip()))
+        self.lines.append(indent + "-- %d lines hidden\n" % self.hiding_lean_numlines)
+        self.hiding_lean = False
       else:
-        self.hiding_lean = not line.rstrip().endswith("-- }}"+"}")
+        self.hiding_lean_numlines += 1
       return
 
   def _inject_def_symbol_labels(self, line, lineno):
@@ -251,7 +258,7 @@ class TeXProcessor(Processor):
         # the link at the next space.
         start = max(0, c-1)
         while c < len(line) and not line[c].isspace() and line[c] not in ['[',']',',',';']: c += 1
-        self.proof_states.append((lineno, c, line[start:c], goal))
+        self.proof_states.append((lineno, c, line[start:c], goal, len(self.lean_processor.contents)))
         points.append((start, c))
 
     new_line = ""
@@ -297,8 +304,8 @@ class TeXProcessor(Processor):
   def export(self, file):
     open(file, "w").write("".join(self.lines))
     open("proof_" + file, "w").write("\section{Proof Goals}\n\n" + "\n\n".join([
-      "\\begin{leanProofGoal}{%d}{%d}{%s}\n%s\n\\end{leanProofGoal} " % (lineno, char, name, self._format_proof_goal(goal))
-      for (lineno, char, name, goal) in self.proof_states
+      "\\begin{leanProofGoal}{%d}{%d}{%s}{%d}\n%s\n\\end{leanProofGoal} " % (lineno, char, name, lean_lineno, self._format_proof_goal(goal))
+      for (lineno, char, name, goal, lean_lineno) in self.proof_states
     ]))
 
 

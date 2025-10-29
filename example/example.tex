@@ -4,6 +4,7 @@
 
 \usepackage{amssymb} % used for the \blacktriangleright in minted
 \usepackage{minted}
+\usepackage{multicol}
 \usemintedstyle{pastie}
 
 \usepackage[dvipsnames]{xcolor}
@@ -38,14 +39,15 @@
   \index{\leanRef{#1}{#2}}%
 }
 
-\newenvironment{leanProofGoal}[3]
+\newenvironment{leanProofGoal}[4]
  {\VerbatimEnvironment
-  \subsection*{\hyperref[lean:proof:#1:#2:back]{#3}}
+  \phantomsection
   \label{lean:proof:#1:#2}
-  \begin{minipage}{\textwidth}
+  \noindent {\footnotesize \textbf{\hyperref[lean:proof:#1:#2:back]{Line #4: #3}}}\\
+  \begin{minipage}{\linewidth}
   \centering
-  \begin{minted}[frame=lines]{lean4}}
- {\end{minted}\end{minipage}}
+  \begin{minted}[frame=lines, fontsize=\tiny]{lean4}}
+ {\end{minted}\end{minipage}\\}
 
 \makeatletter
 \newcommand{\leanProofGoalRef}[2]{%
@@ -67,5 +69,7 @@
 \bibliography{out}
 \printindex
 \appendix
+\begin{multicols}{2}
 \input{proof_out.tex}
+\end{multicols}
 \end{document}
