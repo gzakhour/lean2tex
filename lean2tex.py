@@ -317,8 +317,13 @@ def main():
   state_stack = [State.LEAN]
   lineno = 0
 
-  for line in open(sys.argv[1]).readlines():
+  all_lines = list(open(sys.argv[1]).readlines())
+  num_lines = len(all_lines)
+
+  for line in all_lines:
     lineno += 1
+    print("Processing line %d/%d (%.2f%%)" % (lineno, num_lines, lineno*100/num_lines), end='\r')
+    sys.stdout.flush()
     clean_line = line.strip()
     if clean_line == "/-@tex" or clean_line == "/-@":
       state_stack.append(State.TEX)
@@ -340,6 +345,7 @@ def main():
   bib_processor.export("out.bib")
   lean_processor.export("out.lean")
   tex_processor.export("out.tex")
+  print()
 
 if __name__ == '__main__':
   main()
